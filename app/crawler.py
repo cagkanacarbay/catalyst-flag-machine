@@ -3,8 +3,8 @@ from bs4 import BeautifulSoup
 
 # Your login details
 payload = {
-    'emailAddress': 'chakhan.lk9@gmail.com',  # replace with your email
-    'password': 'VYP7&v9Wh5#J'  # replace with your password
+    'emailAddress': 'xxx',  # replace with your email
+    'password': 'yyy'  # replace with your password
 }
 
 # Use 'with' to ensure the session context is closed after use
