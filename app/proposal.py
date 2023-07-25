@@ -3,12 +3,6 @@ from app.ideascale import get_proposal_html, signin
 from scripts.allocated_proposals import load_allocated_proposal_urls
 
 
-driver = signin()
-allocated_proposal_urls = load_allocated_proposal_urls()
-html = get_proposal_html(driver, proposal_url=allocated_proposal_urls[3])
-
-soup = BeautifulSoup(html, 'html.parser')
-
 def extract_answer(soup: BeautifulSoup, question: str, answer_type: type = str):
 
     question_tag = soup.find("dt", string=question)
@@ -103,7 +97,7 @@ class Proposal:
     def __init__(self, html):
         soup = BeautifulSoup(html, 'html.parser')
 
-        #
+        # GENERAL
         self.title = soup.find('h1').text
         self.challenge = soup.find('p', class_='idea-campaign').a.text
         self.problem_statement = soup.find('div', class_='ql-editor ql-render').get_text(strip=True)
@@ -120,14 +114,32 @@ class Proposal:
             question="[GENERAL] Please specify how many months you expect your project to last  (from 2-12 months)"
         )
 
-
         self.links = extract_relevant_links(soup)
         self.is_opensource = extract_answer(
             soup, answer_type=bool, question="[GENERAL] Will your project’s output/s be fully open source?"
         )
         self.category = extract_answer(soup, question="[METADATA] Category of proposal")
 
-        # IMPACT
+        self.impact = {
+            "proposed_solution": extract_long_answer(
+                soup, question="[IMPACT] Please describe your proposed solution."
+            ),
+            "challenge_and_cardano_benefits": extract_long_answer(
+                soup, question="[IMPACT] How does your proposed solution address the challenge "
+                               "and what benefits will this bring to the Cardano ecosystem?",
+            ),
+            "measuring_success": extract_long_answer(
+                soup, question="[IMPACT] How do you intend to measure the success of your project?",
+            ),
+            "output_plans": extract_long_answer(
+                soup, question="[IMPACT] Please describe your plans to share the outputs and results of your project?"
+            )
+        }
+
+        self.capability = {
+
+        }
+
 
     def __repr__(self):
         return f"{self.challenge} - {self.title} - {self.requested_funds} ADA"
@@ -143,13 +155,12 @@ class Proposal:
 
 
 
-# Create an instance of Proposal with the data you extracted
-proposal = Proposal(html)
-print(proposal)
+if __name__ == "__main__":
+    driver = signin()
+    allocated_proposal_urls = load_allocated_proposal_urls()
+    html = get_proposal_html(driver, proposal_url=allocated_proposal_urls[3])
 
-# Print the data
-print(f'Title: {proposal.title}')
-print(f'Challenge: {proposal.challenge}')
-print(f'Problem Statement: {proposal.problem_statement}')
-print(f'Proposers: {proposal.proposers}')
+    proposal = Proposal(html)
+    print(proposal)
+
 
