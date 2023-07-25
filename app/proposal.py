@@ -1,119 +1,155 @@
-from dataclasses import dataclass
-from app.pdf_utils import read_pdf, clean_proposal_text
-import pprint
+from bs4 import BeautifulSoup
+from app.ideascale import get_proposal_html, signin
+from scripts.allocated_proposals import load_allocated_proposal_urls
 
 
-@dataclass
-class Proposal:
-    title: str
-    solution: str
-    problem: str
-    proposers: list[str]
-    requested_funds: int
-    challenge: str
-    project_length_in_months: int
-    problem_perception: str
-    approach_reason: str
-    project_engagement: str
-    impact_proof: str
-    challenge_address: str
-    success_metrics: str
-    output_sharing: str
-    previous_funding: str
-    project_goals: str
-    feasibility_validation: str
-    timeline_milestones: str
-    deliverables: str
-    budget: str
-    team_members: str
-    value_for_money: str
-    agreement_acceptance: str
-    main_proposer: str
-    additional_proposers: str
-    open_source: str
+driver = signin()
+allocated_proposal_urls = load_allocated_proposal_urls()
+html = get_proposal_html(driver, proposal_url=allocated_proposal_urls[3])
 
-    @classmethod
-    def instantiate_from_text(cls, text: str):
+soup = BeautifulSoup(html, 'html.parser')
 
-        lines = text.split("\n")
+def extract_answer(soup: BeautifulSoup, question: str, answer_type: type = str):
 
-        proposal = {
-            "challenge": lines[0].split("Campaign: ")[1].split("Project")[0],
-            "idea": lines[4].split(': ')[1],
+    question_tag = soup.find("dt", string=question)
+    answer_tag = question_tag.find_next_sibling("dd")
 
-        }
+    # remove this from the text "Answer:
+    answer = answer_tag.get_text(strip=True).split(":")[1]
+    if answer_type == str:
+        return answer
+    elif answer_type == int:
+        return int(answer)
+    elif answer_type == bool:
+        return True if answer == 'Yes' else False
+
+def extract_relevant_links(soup):
+    question = "[GENERAL] Website/ GitHub repository, or any other relevant link"
+    links_html = soup.find("dt", string=question).find_next_sibling("dd")
+    links = [link.get('href') for link in links_html.find_all('a')]
+    return links
 
 
-
-        answers = text.split("Answer:\n")[1:]
-        values = [answer.strip().split('\n')[0] for answer in answers]
-
-
-        print(1)
-        # return cls(*values)
-        return cls(*values)
-
-
-def replace_newlines_with_spaces(text: str):
-    return text.replace("\n", " ")
-
-def extract_problem_statement(full_proposal_text: str):
-    return full_proposal_text.split("Idea Details: Notes:")[1].split("Custom")[0]
-
-def extract_solution_and_links(proposal_answers: [str]):
-    cleaned = replace_newlines_with_spaces(proposal_answers[3])
-    split_text = cleaned.split("Link")
-    return {
-        "solution": split_text[0],
-        "links": split_text[1:]
-    }
-
-
-# def read_proposal_pdf(file_path: str):
-
-file_path = r"D:\Projects\flag-machine\proposals\Ideas-2023-07-18-06-35-55.pdf"
-text = read_pdf(file_path)
-
-def extract_header_info(proposal_text: str):
-    proposal_text = text
-    lines = proposal_text.split("\n")[:5]
-
-    return {
-        "challenge": lines[0].split("Campaign: ")[1].split("Project")[0],
-        "idea": lines[4].split(': ')[1],
-        "main_applicant": lines[2].split(": ")[1],
-        "date_of_submission": lines[3].split(": ")[1],
-    }
-
-
-
-
-# x = Proposal.instantiate_from_text(pdf)
-
-proposal = extract_header_info(text)
-
-
-proposal_text, lines = clean_proposal_text(text)
-
-
-answers = proposal_text.split("Answer:\n")[1:]
+# title = soup.find('h1').text
+# challenge = soup.find('p', class_='idea-campaign').a.text
+# problem_statement_div = soup.find('div', class_='ql-editor ql-render').get_text(strip=True)
 #
-answers = [answer.replace("\n", " ") for answer in answers]
+# proposers = soup.find("dt", string="[GENERAL] Name and surname of main applicant").find_next_sibling("dd").get_text(strip=True).split(':')[1]
+# additional_applicants = soup.find("dt", string="Additional applicants").find_next_sibling("dd").get_text(strip=True).split(':')[1]
+#
+# if additional_applicants.lower() != "none":
+#     proposers += [app.strip() for app in additional_applicants.split(",")]
+#
+# requested_funds = extract_answer(soup, question="[GENERAL] Requested funds in ada", answer_type=int)
+# project_duration = extract_answer(
+#     soup, answer_type=int,
+#     question="[GENERAL] Please specify how many months you expect your project to last  (from 2-12 months)"
+# )
+# solution_statement = extract_answer(
+#     soup, question="[GENERAL] Summarize your solution to the problem (200-character limit including spaces)"
+# )
+#
+# links = extract_relevant_links(soup)
+#
+# is_opensource = extract_answer(soup, question="[GENERAL] Will your project’s output/s be fully open source?",
+#                                answer_type=bool)
+#
+# category = extract_answer(soup, question="[METADATA] Category of proposal")
 
-proposal = {
-    **proposal,
-    "requested_funds": int(answers[1]),
-    "timeline": int(answers[2]),
-    "problem": extract_problem_statement(answers[3])
 
-    # ""
-}
-
-# proposal = {**proposal, **extract_solution_and_links(answers)}
-
-pprint.pprint(proposal)
+def extract_long_answer(soup: BeautifulSoup, question: str):
+    question_tag = soup.find("dt", string=question)
+    answer_tag = question_tag.find_next_sibling("dd")
+    return ' '.join(answer_tag.stripped_strings)
 
 
+impact_questions = [
+    "[IMPACT] Please describe your proposed solution.",
+    "[IMPACT] How does your proposed solution address the challenge and what benefits will this bring to the Cardano ecosystem?",
+    "[IMPACT] How do you intend to measure the success of your project?",
+    "[IMPACT] Please describe your plans to share the outputs and results of your project?"
+]
+
+capability_feasibility_questions = [
+    "[CAPABILITY/ FEASIBILITY] What is your capability to deliver your project with high levels of trust and accountability?",
+    "[CAPABILITY/ FEASIBILITY] What are the main goals for the project and how will you validate if your approach is feasible?",
+    "[CAPABILITY/ FEASIBILITY] Please provide a detailed breakdown of your project’s milestones and each of the main tasks or activities to reach the milestone plus the expected timeline for the delivery.",
+    "[CAPABILITY/ FEASIBILITY] Please describe the deliverables, outputs and intended outcomes of each milestone."
+]
+
+resources_value_questions = [
+    "[RESOURCES & VALUE FOR MONEY] Please provide a detailed budget breakdown of the proposed work and resources.",
+    "[RESOURCES & VALUE FOR MONEY] Who is in the project team and what are their roles?",
+    "[RESOURCES & VALUE FOR MONEY] How does the cost of the project represent value for money for the Cardano ecosystem?"
+]
 
 
+impact_answers = {}
+capability_feasibility_answers = {}
+resources_value_answers = {}
+
+# Extract answers for each question
+for question in impact_questions:
+    impact_answers[question] = extract_long_answer(soup, question)
+
+for question in capability_feasibility_questions:
+    capability_feasibility_answers[question] = extract_long_answer(soup, question)
+
+for question in resources_value_questions:
+    resources_value_answers[question] = extract_long_answer(soup, question)
+
+
+class Proposal:
+    def __init__(self, html):
+        soup = BeautifulSoup(html, 'html.parser')
+
+        #
+        self.title = soup.find('h1').text
+        self.challenge = soup.find('p', class_='idea-campaign').a.text
+        self.problem_statement = soup.find('div', class_='ql-editor ql-render').get_text(strip=True)
+        self.solution_statement = extract_answer(
+            soup, question="[GENERAL] Summarize your solution to the problem (200-character limit including spaces)"
+        )
+
+        self.main_proposer = extract_answer(soup, "[GENERAL] Name and surname of main applicant")
+        self.additional_proposers = self.extract_additional_proposers(soup)
+
+        self.requested_funds = extract_answer(soup, question="[GENERAL] Requested funds in ada", answer_type=int)
+        self.project_duration = extract_answer(
+            soup, answer_type=int,
+            question="[GENERAL] Please specify how many months you expect your project to last  (from 2-12 months)"
+        )
+
+
+        self.links = extract_relevant_links(soup)
+        self.is_opensource = extract_answer(
+            soup, answer_type=bool, question="[GENERAL] Will your project’s output/s be fully open source?"
+        )
+        self.category = extract_answer(soup, question="[METADATA] Category of proposal")
+
+        # IMPACT
+
+    def __repr__(self):
+        return f"{self.challenge} - {self.title} - {self.requested_funds} ADA"
+
+    @staticmethod
+    def extract_additional_proposers(soup):
+        additional_proposers = extract_answer(soup, question="Additional applicants")
+
+        if additional_proposers.lower() != "none":
+            return [app.strip() for app in additional_proposers]
+
+
+
+
+
+# Create an instance of Proposal with the data you extracted
+proposal = Proposal(html)
+print(proposal)
+
+# Print the data
+print(f'Title: {proposal.title}')
+print(f'Challenge: {proposal.challenge}')
+print(f'Problem Statement: {proposal.problem_statement}')
+print(f'Proposers: {proposal.proposers}')
 

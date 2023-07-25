@@ -1,6 +1,7 @@
 import openai
+from settings import constants
 
-openai.api_key = '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'
+openai.api_key = constants["OPENAI_APIKEY"]
 
 
 def ask_jesus(prompt):
