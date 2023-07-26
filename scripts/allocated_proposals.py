@@ -9,7 +9,7 @@ import json
 def get_allocated_proposal_urls_for_profile(driver: webdriver, profile_url: str):
 
     driver.get(profile_url)
-    time.sleep(3)  # let the page load
+    time.sleep(5)  # let the page load
     allocations = driver.find_element(By.XPATH, '/html/body/div[2]/div[3]/div/aside/div/div/section[3]/div/article/div/div[1]/ul/li[4]/div/div')
     links = allocations.find_elements(By.TAG_NAME, 'a')
     urls = [link.get_attribute('href') for link in links]
@@ -19,11 +19,11 @@ def get_allocated_proposal_urls_for_profile(driver: webdriver, profile_url: str)
 
 if __name__ == "__main__":
 
-    driver = signin(constants['CARDANO_IDEASCALE_EMAIL'], constants["CARDANO_IDEASCALE_PASSWORD"])
+    driver = signin()
 
     allocated_proposal_urls = get_allocated_proposal_urls_for_profile(driver, "https://cardano.ideascale.com/c/profile/168852/activity")
 
-    with open("allocated_proposals_chakhan.json", "w") as file:
+    with open("proposals/allocated_proposals_chakhan.json", "w") as file:
         file.write(json.dumps(allocated_proposal_urls))
 
 

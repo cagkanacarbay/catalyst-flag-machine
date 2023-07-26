@@ -1,6 +1,6 @@
 from app.pdf_utils import read_pdf
 from app.openai import ask_jesus
-from app.prompts import analyze_proposal_prompt_v1
+from scripts.pickle_proposals import analyze_proposal_prompt_v1
 
 # Test the function
 pdf_text = read_pdf('proposals/Ideas-2023-07-13-12-37-43.pdf')

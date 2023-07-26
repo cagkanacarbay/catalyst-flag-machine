@@ -6,10 +6,13 @@ from scripts.allocated_proposals import load_allocated_proposal_urls
 def extract_answer(soup: BeautifulSoup, question: str, answer_type: type = str):
 
     question_tag = soup.find("dt", string=question)
+
+    if question_tag is None:
+        return None
+
     answer_tag = question_tag.find_next_sibling("dd")
 
-    # remove this from the text "Answer:
-    answer = answer_tag.get_text(strip=True).split(":")[1]
+    answer = answer_tag.get_text(strip=True).split(":")[1]  # remove "Answer:" from the text
     if answer_type == str:
         return answer
     elif answer_type == int:
@@ -17,38 +20,17 @@ def extract_answer(soup: BeautifulSoup, question: str, answer_type: type = str):
     elif answer_type == bool:
         return True if answer == 'Yes' else False
 
+
 def extract_relevant_links(soup):
     question = "[GENERAL] Website/ GitHub repository, or any other relevant link"
-    links_html = soup.find("dt", string=question).find_next_sibling("dd")
-    links = [link.get('href') for link in links_html.find_all('a')]
-    return links
+    links_html = soup.find("dt", string=question)
 
-
-# title = soup.find('h1').text
-# challenge = soup.find('p', class_='idea-campaign').a.text
-# problem_statement_div = soup.find('div', class_='ql-editor ql-render').get_text(strip=True)
-#
-# proposers = soup.find("dt", string="[GENERAL] Name and surname of main applicant").find_next_sibling("dd").get_text(strip=True).split(':')[1]
-# additional_applicants = soup.find("dt", string="Additional applicants").find_next_sibling("dd").get_text(strip=True).split(':')[1]
-#
-# if additional_applicants.lower() != "none":
-#     proposers += [app.strip() for app in additional_applicants.split(",")]
-#
-# requested_funds = extract_answer(soup, question="[GENERAL] Requested funds in ada", answer_type=int)
-# project_duration = extract_answer(
-#     soup, answer_type=int,
-#     question="[GENERAL] Please specify how many months you expect your project to last  (from 2-12 months)"
-# )
-# solution_statement = extract_answer(
-#     soup, question="[GENERAL] Summarize your solution to the problem (200-character limit including spaces)"
-# )
-#
-# links = extract_relevant_links(soup)
-#
-# is_opensource = extract_answer(soup, question="[GENERAL] Will your project’s output/s be fully open source?",
-#                                answer_type=bool)
-#
-# category = extract_answer(soup, question="[METADATA] Category of proposal")
+    if links_html is not None:
+        links_html = links_html.find_next_sibling("dd")
+        links = [link.get('href') for link in links_html.find_all('a')]
+        return links
+    else:
+        return None
 
 
 def extract_long_answer(soup: BeautifulSoup, question: str):
@@ -57,40 +39,11 @@ def extract_long_answer(soup: BeautifulSoup, question: str):
     return ' '.join(answer_tag.stripped_strings)
 
 
-impact_questions = [
-    "[IMPACT] Please describe your proposed solution.",
-    "[IMPACT] How does your proposed solution address the challenge and what benefits will this bring to the Cardano ecosystem?",
-    "[IMPACT] How do you intend to measure the success of your project?",
-    "[IMPACT] Please describe your plans to share the outputs and results of your project?"
-]
+def extract_additional_proposers(soup):
+    additional_proposers = extract_answer(soup, question="Additional applicants")
 
-capability_feasibility_questions = [
-    "[CAPABILITY/ FEASIBILITY] What is your capability to deliver your project with high levels of trust and accountability?",
-    "[CAPABILITY/ FEASIBILITY] What are the main goals for the project and how will you validate if your approach is feasible?",
-    "[CAPABILITY/ FEASIBILITY] Please provide a detailed breakdown of your project’s milestones and each of the main tasks or activities to reach the milestone plus the expected timeline for the delivery.",
-    "[CAPABILITY/ FEASIBILITY] Please describe the deliverables, outputs and intended outcomes of each milestone."
-]
-
-resources_value_questions = [
-    "[RESOURCES & VALUE FOR MONEY] Please provide a detailed budget breakdown of the proposed work and resources.",
-    "[RESOURCES & VALUE FOR MONEY] Who is in the project team and what are their roles?",
-    "[RESOURCES & VALUE FOR MONEY] How does the cost of the project represent value for money for the Cardano ecosystem?"
-]
-
-
-impact_answers = {}
-capability_feasibility_answers = {}
-resources_value_answers = {}
-
-# Extract answers for each question
-for question in impact_questions:
-    impact_answers[question] = extract_long_answer(soup, question)
-
-for question in capability_feasibility_questions:
-    capability_feasibility_answers[question] = extract_long_answer(soup, question)
-
-for question in resources_value_questions:
-    resources_value_answers[question] = extract_long_answer(soup, question)
+    if additional_proposers.lower() != "none":
+        return [app.strip() for app in additional_proposers]
 
 
 class Proposal:
@@ -106,7 +59,7 @@ class Proposal:
         )
 
         self.main_proposer = extract_answer(soup, "[GENERAL] Name and surname of main applicant")
-        self.additional_proposers = self.extract_additional_proposers(soup)
+        self.additional_proposers = extract_additional_proposers(soup)
 
         self.requested_funds = extract_answer(soup, question="[GENERAL] Requested funds in ada", answer_type=int)
         self.project_duration = extract_answer(
@@ -136,23 +89,44 @@ class Proposal:
             )
         }
 
-        self.capability = {
-
+        self.capability_feasibility = {
+            "capability_to_deliver": extract_long_answer(
+                soup, question="[CAPABILITY/ FEASIBILITY] What is your capability to deliver your project "
+                               "with high levels of trust and accountability?"
+            ),
+            "main_goals_and_feasibility": extract_long_answer(
+                soup, question="[CAPABILITY/ FEASIBILITY] What are the main goals for the project and "
+                               "how will you validate if your approach is feasible?"
+            ),
+            "detailed_breakdown": extract_long_answer(
+                soup, question="[CAPABILITY/ FEASIBILITY] Please provide a detailed breakdown of your "
+                               "project’s milestones and each of the main tasks or activities to reach the milestone "
+                               "plus the expected timeline for the delivery."
+            ),
+            "milestone_deliverables": extract_long_answer(
+                soup, question="[CAPABILITY/ FEASIBILITY] Please describe the deliverables, outputs and "
+                               "intended outcomes of each milestone."
+            )
         }
 
+        self.resources_value_for_money = {
+            "budget_breakdown": extract_long_answer(
+                soup,
+                question="[RESOURCES & VALUE FOR MONEY] Please provide a detailed budget breakdown "
+                         "of the proposed work and resources."
+            ),
+            "project_team": extract_long_answer(
+                soup, question="[RESOURCES & VALUE FOR MONEY] Who is in the project team and what are their roles?"
+            ),
+            "value_for_money": extract_long_answer(
+                soup,
+                question="[RESOURCES & VALUE FOR MONEY] How does the cost of the project represent "
+                         "value for money for the Cardano ecosystem?"
+            )
+        }
 
     def __repr__(self):
         return f"{self.challenge} - {self.title} - {self.requested_funds} ADA"
-
-    @staticmethod
-    def extract_additional_proposers(soup):
-        additional_proposers = extract_answer(soup, question="Additional applicants")
-
-        if additional_proposers.lower() != "none":
-            return [app.strip() for app in additional_proposers]
-
-
-
 
 
 if __name__ == "__main__":
